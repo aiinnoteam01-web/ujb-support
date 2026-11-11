@@ -13,7 +13,7 @@ import hashlib
 import html
 import re
 
-CATEGORIES = ["자금·융자", "일자리", "주거", "교육", "생활·복지", "판로·수출", "문화·참여"]
+CATEGORIES = ["사업 지원", "일자리", "주거", "교육", "생활·복지", "문화·참여"]
 
 _DATE = re.compile(r"(20\d{2})[.\-/년\s]*(\d{1,2})[.\-/월\s]*(\d{1,2})")
 _COMPACT = re.compile(r"^(20\d{2})(\d{2})(\d{2})$")
@@ -27,7 +27,7 @@ def clean(text) -> str:
     if not text:
         return ""
     text = html.unescape(_TAG.sub(" ", str(text)))
-    return re.sub(r"[ \t ]+", " ", text).strip()
+    return re.sub(r"[ \t\u00a0]+", " ", text).strip()
 
 
 def to_date(text) -> str | None:
@@ -96,7 +96,7 @@ GOV24_CATEGORY = {
     "일자리": "일자리", "주거·자립": "주거", "보육·교육": "교육",
     "생활안정": "생활·복지", "보건·의료": "생활·복지", "보호·돌봄": "생활·복지",
     "임신·출산": "생활·복지", "문화·환경": "문화·참여", "행정·안전": "생활·복지",
-    "농림축산어업": "자금·융자",
+    "농림축산어업": "사업 지원",
 }
 
 
@@ -114,14 +114,14 @@ def gov24(raw: dict) -> dict:
         url=raw.get("상세조회URL") or "", start=start, end=end, period_text=deadline,
         always=is_always(deadline) or not end, age_min=lo, age_max=hi,
         user_type=clean(raw.get("사용자구분")),
-        category="자금·융자" if "융자" in (raw.get("지원유형") or "") else GOV24_CATEGORY.get(clean(raw.get("서비스분야")), "생활·복지"),
+        category="사업 지원" if "융자" in (raw.get("지원유형") or "") else GOV24_CATEGORY.get(clean(raw.get("서비스분야")), "생활·복지"),
         views=int(raw.get("조회수") or 0),
     )
 
 
 # ---- 기업마당 (중소벤처기업부, 공공누리 제3유형: 내용 변경 금지) ----
-BIZINFO_CATEGORY = {"금융": "자금·융자", "기술": "자금·융자", "창업": "자금·융자", "인력": "일자리",
-                    "수출": "판로·수출", "내수": "판로·수출", "경영": "교육", "기타": "생활·복지"}
+BIZINFO_CATEGORY = {"금융": "사업 지원", "기술": "사업 지원", "창업": "사업 지원", "인력": "일자리",
+                    "수출": "사업 지원", "내수": "사업 지원", "경영": "사업 지원", "기타": "생활·복지"}
 
 def bizinfo(raw: dict) -> dict:
     period_text = clean(raw.get("reqstBeginEndDe"))
@@ -137,19 +137,18 @@ def bizinfo(raw: dict) -> dict:
         always=is_always(period_text) or not end,
         youth_hint="청년" in (raw.get("hashtags") or ""),
         target_hints=["창업"] if realm == "창업" else [],
-        category=BIZINFO_CATEGORY.get(realm, "자금·융자"),
+        category=BIZINFO_CATEGORY.get(realm, "사업 지원"),
         views=int(raw.get("inqireCo") or 0),
     )
 
 
 # ---- K-Startup (창업진흥원) ----
 def _kstartup_category(kind: str) -> str:
-    for words, cat in [(("융자", "사업화", "자금"), "자금·융자"), (("멘토", "컨설팅", "교육"), "교육"),
-                       (("판로", "해외", "글로벌"), "판로·수출"), (("행사", "네트워크"), "문화·참여"),
+    for words, cat in [(("멘토", "컨설팅", "교육"), "교육"), (("행사", "네트워크"), "문화·참여"),
                        (("인력",), "일자리")]:
         if any(w in kind for w in words):
             return cat
-    return "자금·융자"
+    return "사업 지원"  # 사업화·융자·판로·해외진출 등
 
 
 def kstartup(raw: dict) -> dict:
@@ -176,7 +175,7 @@ def kstartup(raw: dict) -> dict:
 
 
 # ---- 경기도 일자리 지원정책 (경기도일자리재단 잡아바, 경기데이터드림) ----
-JOBABA_CATEGORY = {"주거": "주거", "생활": "생활·복지", "기업": "자금·융자"}
+JOBABA_CATEGORY = {"주거": "주거", "생활": "생활·복지", "기업": "사업 지원"}
 
 
 def jobaba(raw: dict) -> dict:
