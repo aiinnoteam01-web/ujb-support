@@ -1,32 +1,33 @@
 {
- "updated_at": "2026-11-11T15:04+09:00",
+ "updated_at": "2026-11-11T17:16+09:00",
  "sources": {
   "gov24": {
    "name": "보조금24",
    "ok": true,
    "fetched": 10942,
    "kept": 2127,
-   "seconds": 26.9
+   "seconds": 24.8
   },
   "bizinfo": {
    "name": "기업마당",
    "ok": true,
-   "fetched": 1342,
-   "kept": 342,
-   "seconds": 9.1
+   "fetched": 1370,
+   "kept": 352,
+   "seconds": 11.8
   },
   "kstartup": {
    "name": "K-Startup",
    "ok": true,
    "fetched": 216,
    "kept": 115,
-   "seconds": 2.8
+   "seconds": 2.4
   },
   "jobaba": {
    "name": "경기도 잡아바",
-   "ok": false,
-   "error": "HTTPSConnectionPool(host='openapi.gg.go.kr', port=443): Max retries exceeded with url: /JobFndtnSportPolocy?KEY=a7acdb0db9384269983fdc3f691deece&Type=json&pIndex=1&pSize=1000 (Caused by ConnectTimeout",
-   "kept": 68
+   "ok": true,
+   "fetched": 205,
+   "kept": 69,
+   "seconds": 1.3
   }
  }
 }
