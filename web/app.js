@@ -5,7 +5,7 @@
   // ---------- 상수 ----------
   const SCOPE = { uijeongbu: "의정부시", gyeonggi: "경기도", national: "전국" };
   const TARGETS = ["청년", "시니어", "장애인", "임산부·출산", "소상공인", "중소기업", "창업", "법인·단체"];
-  const CATEGORIES = ["자금·융자", "일자리", "주거", "교육", "생활·복지", "판로·수출", "문화·참여"];
+  const CATEGORIES = ["일자리", "주거", "교육", "생활·복지", "사업지원", "문화·참여"];
   const SOURCES = { gov24: "보조금24", bizinfo: "기업마당", kstartup: "K-Startup", jobaba: "경기도 잡아바" };
   const SOURCE_FULL = { gov24: "행정안전부 보조금24", bizinfo: "중소벤처기업부 기업마당(공공누리 제3유형)", kstartup: "창업진흥원 K-Startup", jobaba: "경기도 잡아바(경기데이터드림)" };
   const SORTS = { deadline: "마감 임박순", views: "많이 본 순", name: "이름순" };
