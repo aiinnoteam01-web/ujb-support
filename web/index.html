@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="description" content="의정부 시민·소상공인·기업이 신청할 수 있는 의정부시·경기도·전국 지원사업을 한곳에 모았습니다.">
+<title>의정부 지원모아</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&amp;family=Noto+Sans+KR:wght@400;500;700&amp;display=swap">
+<link rel="stylesheet" href="app.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">본문 바로가기</a>
+<header class="site-header">
+  <div class="wrap header-row">
+    <a class="logo" href="#/"><span class="logo-mark" aria-hidden="true">지</span><span><span class="logo-name">의정부 지원모아</span><br><span class="logo-sub">우리 동네 지원사업, 한곳에서 찾아요</span></span></a>
+    <p class="updated" id="updated">불러오는 중…</p>
+  </div>
+</header>
+<main id="main" class="wrap" tabindex="-1">
+  <p class="empty">지원사업을 불러오는 중이에요…</p>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <p>자료: 행정안전부 보조금24 · 중소벤처기업부 기업마당(공공누리 제3유형) · 창업진흥원 K-Startup · 경기도 잡아바 (공공데이터포털·경기데이터드림)</p>
+    <p class="source-status">수집 현황: <span id="source-status">-</span></p>
+    <p>의정부시 사업, 경기도 전체 또는 의정부 포함 지역 사업, 지역 제한 없는 전국 사업만 보여 줍니다. 다른 시·군·도만 대상인 사업과 마감된 공고는 뺍니다. 의정부시 공식 사이트가 아니며, 신청 전에는 원문 공고를 확인하세요.</p>
+  </div>
+</footer>
+<dialog id="detail" aria-labelledby="detail-title"></dialog>
+</body>
+</html>
