@@ -39,7 +39,7 @@ def test_bizinfo_sample():
            "reqstBeginEndDe": "2026-11-03 ~ 2026-11-13", "hashtags": "창업,청년", "pldirSportRealmLclasCodeNm": "창업",
            "pblancUrl": "https://www.bizinfo.go.kr/x", "inqireCo": 10}
     it = n.bizinfo(raw)
-    assert it["end"] == "2026-11-13" and it["youth_hint"] and it["category"] == "자금·융자" and it["target_hints"] == ["창업"]
+    assert it["end"] == "2026-11-13" and it["youth_hint"] and it["category"] == "사업 지원" and it["target_hints"] == ["창업"]
 
 
 def test_kstartup_youth_only():
