@@ -1,196 +1,116 @@
-"""출처별 원본 한 건을 공통 형식으로 바꿉니다.
+"""인허가 API 원본 한 건을 공통 형식 한 건으로 바꿉니다.
 
-공통 형식(dict):
-  id, source, kind("notice" 모집 공고 | "service" 공공서비스), title, agency,
-  region_code, region_text, target_text, summary, apply_method, contact, url,
-  start, end (YYYY-MM-DD 또는 None), period_text, always(상시 여부),
-  age_min, age_max, youth_hint(출처가 청년 대상이라고 표시했는지), user_type(사용자구분),
-  target_hints(출처가 알려 준 대상), category, views
+공통 형식 (data/records.json 의 한 줄)
+  {"source", "name", "uptae", "type", "open", "close", "lotno", "road", "lat", "lng"}
+필드명이 API 버전에 따라 다를 수 있어 후보 이름을 앞에서부터 찾습니다.
+처음 연결할 때는 `python collect.py --inspect` 로 실제 필드명을 확인하세요.
 """
 from __future__ import annotations
 
-import hashlib
-import html
 import re
+from datetime import date
+from pathlib import Path
 
-CATEGORIES = ["사업 지원", "일자리", "주거", "교육", "생활·복지", "문화·참여"]
+import yaml
 
-_DATE = re.compile(r"(20\d{2})[.\-/년\s]*(\d{1,2})[.\-/월\s]*(\d{1,2})")
-_COMPACT = re.compile(r"^(20\d{2})(\d{2})(\d{2})$")
-_TAG = re.compile(r"<[^>]+>")
-_AGE_RANGE = re.compile(r"(?:만\s*)?(\d{1,2})\s*세?\s*(?:이상)?\s*[~∼\-]\s*(?:만\s*)?(\d{1,2})\s*세")
-_AGE_MAX = re.compile(r"(?:만\s*)?(\d{1,2})\s*세\s*(?:이하|미만)")
-_AGE_MIN = re.compile(r"(?:만\s*)?(\d{1,2})\s*세\s*이상")
+RULES = Path(__file__).resolve().parent.parent / "rules"
+TYPES: dict[str, list[str]] = yaml.safe_load((RULES / "types.yaml").read_text(encoding="utf-8"))
 
-
-def clean(text) -> str:
-    if not text:
-        return ""
-    text = html.unescape(_TAG.sub(" ", str(text)))
-    return re.sub(r"[ \t\u00a0]+", " ", text).strip()
-
-
-def to_date(text) -> str | None:
-    if not text:
-        return None
-    s = str(text).strip()
-    m = _COMPACT.match(s)
-    if m:
-        y, mo, d = m.groups()
-    else:
-        m = _DATE.search(s)
-        if not m:
-            return None
-        y, mo, d = m.groups()
-    mo, d = int(mo), int(d)
-    if not (1 <= mo <= 12 and 1 <= d <= 31):
-        return None
-    return f"{y}-{mo:02d}-{d:02d}"
-
-
-def period(text) -> tuple[str | None, str | None]:
-    """'2026-11-03 ~ 2026-11-13' 같은 기간 문자열에서 시작·끝 날짜."""
-    if not text:
-        return None, None
-    found = [to_date("".join(m)) for m in _DATE.findall(str(text))]
-    found = [f for f in found if f]
-    if not found:
-        return None, None
-    if len(found) == 1:
-        return None, found[0]
-    return found[0], found[-1]
-
-
-def is_always(text) -> bool:
-    return bool(text) and any(w in str(text) for w in ["상시", "수시", "연중", "예산 소진", "예산소진"])
-
-
-def ages(text) -> tuple[int | None, int | None]:
-    if not text:
-        return None, None
-    s = str(text)
-    m = _AGE_RANGE.search(s)
-    if m:
-        lo, hi = int(m.group(1)), int(m.group(2))
-        if lo <= hi:
-            return lo, hi
-    hi = _AGE_MAX.search(s)
-    lo = _AGE_MIN.search(s)
-    return (int(lo.group(1)) if lo else None), (int(hi.group(1)) if hi else None)
-
-
-def _base(**kw) -> dict:
-    item = {
-        "id": "", "source": "", "kind": "notice", "title": "", "agency": "",
-        "region_code": None, "region_text": "", "target_text": "", "summary": "",
-        "apply_method": "", "contact": "", "url": "", "start": None, "end": None,
-        "period_text": "", "always": False, "age_min": None, "age_max": None,
-        "youth_hint": False, "user_type": "", "target_hints": [], "category": "생활·복지", "views": 0,
-    }
-    item.update(kw)
-    return item
-
-
-# ---- 보조금24 (행정안전부 대한민국 공공서비스 정보) ----
-GOV24_CATEGORY = {
-    "일자리": "일자리", "주거·자립": "주거", "보육·교육": "교육",
-    "생활안정": "생활·복지", "보건·의료": "생활·복지", "보호·돌봄": "생활·복지",
-    "임신·출산": "생활·복지", "문화·환경": "문화·참여", "행정·안전": "생활·복지",
-    "농림축산어업": "사업 지원",
+FIELDS = {
+    "name":   ["BPLC_NM", "bplcNm"],
+    "uptae":  ["BZSTAT_SE_NM", "SNTTN_BZSTAT_NM", "UPTAE_NM", "uptaeNm"],
+    "open":   ["LCPMT_YMD", "apvPermYmd"],
+    "close":  ["CLSBIZ_YMD", "dcbYmd"],
+    "status": ["SALS_STTS_NM", "trdStateNm"],
+    "lotno":  ["LOTNO_ADDR", "siteWhlAddr"],
+    "road":   ["ROAD_NM_ADDR", "rdnWhlAddr"],
+    "x":      ["CRD_INFO_X", "x"],
+    "y":      ["CRD_INFO_Y", "y"],
 }
 
-
-def gov24(raw: dict) -> dict:
-    target = clean(raw.get("지원대상"))
-    deadline = clean(raw.get("신청기한"))
-    start, end = period(deadline)
-    lo, hi = ages(target)
-    return _base(
-        id=f"gov24:{raw.get('서비스ID')}", source="gov24", kind="service",
-        title=clean(raw.get("서비스명")), agency=clean(raw.get("소관기관명")),
-        target_text=target,
-        summary=clean(raw.get("서비스목적요약")) or clean(raw.get("지원내용")),
-        apply_method=clean(raw.get("신청방법")), contact=clean(raw.get("전화문의")),
-        url=raw.get("상세조회URL") or "", start=start, end=end, period_text=deadline,
-        always=is_always(deadline) or not end, age_min=lo, age_max=hi,
-        user_type=clean(raw.get("사용자구분")),
-        category="사업 지원" if "융자" in (raw.get("지원유형") or "") else GOV24_CATEGORY.get(clean(raw.get("서비스분야")), "생활·복지"),
-        views=int(raw.get("조회수") or 0),
-    )
+_transformer = None
 
 
-# ---- 기업마당 (중소벤처기업부, 공공누리 제3유형: 내용 변경 금지) ----
-BIZINFO_CATEGORY = {"금융": "사업 지원", "기술": "사업 지원", "창업": "사업 지원", "인력": "일자리",
-                    "수출": "사업 지원", "내수": "사업 지원", "경영": "사업 지원", "기타": "생활·복지"}
-
-def bizinfo(raw: dict) -> dict:
-    period_text = clean(raw.get("reqstBeginEndDe"))
-    start, end = period(period_text)
-    realm = clean(raw.get("pldirSportRealmLclasCodeNm"))
-    return _base(
-        id=f"bizinfo:{raw.get('pblancId')}", source="bizinfo",
-        title=clean(raw.get("pblancNm")), agency=clean(raw.get("jrsdInsttNm")),
-        region_text=clean(raw.get("hashtags")), target_text=clean(raw.get("trgetNm")),
-        summary=clean(raw.get("bsnsSumryCn")), apply_method=clean(raw.get("reqstMthPapersCn")),
-        contact=clean(raw.get("refrncNm")), url=raw.get("pblancUrl") or "",
-        start=start, end=end, period_text=period_text,
-        always=is_always(period_text) or not end,
-        youth_hint="청년" in (raw.get("hashtags") or ""),
-        target_hints=["창업"] if realm == "창업" else [],
-        category=BIZINFO_CATEGORY.get(realm, "사업 지원"),
-        views=int(raw.get("inqireCo") or 0),
-    )
+def _to_wgs84(x, y):
+    """EPSG:5174(보정계수 없는 Bessel 중부원점TM) → 위경도. pyproj 가 없으면 생략."""
+    global _transformer
+    try:
+        if _transformer is None:
+            from pyproj import Transformer
+            _transformer = Transformer.from_crs("EPSG:5174", "EPSG:4326", always_xy=True)
+        lng, lat = _transformer.transform(float(x), float(y))
+        return round(lat, 6), round(lng, 6)
+    except Exception:
+        return None, None
 
 
-# ---- K-Startup (창업진흥원) ----
-def _kstartup_category(kind: str) -> str:
-    for words, cat in [(("멘토", "컨설팅", "교육"), "교육"), (("행사", "네트워크"), "문화·참여"),
-                       (("인력",), "일자리")]:
-        if any(w in kind for w in words):
-            return cat
-    return "사업 지원"  # 사업화·융자·판로·해외진출 등
+def pick(rec: dict, names: list[str]):
+    for n in names:
+        v = rec.get(n)
+        if v not in (None, "", " "):
+            return str(v).strip()
+    return None
 
 
-def kstartup(raw: dict) -> dict:
-    age_text = clean(raw.get("biz_trgt_age"))
-    # 40세 이상 구간이 없으면 청년 한정 사업으로 봄
-    youth_only = bool(age_text) and "40세 이상" not in age_text
-    region = clean(raw.get("supt_regin"))
-    return _base(
-        id=f"kstartup:{raw.get('pbanc_sn')}", source="kstartup",
-        title=clean(raw.get("biz_pbanc_nm")) or clean(raw.get("intg_pbanc_biz_nm")),
-        agency=clean(raw.get("pbanc_ntrp_nm")),
-        region_text="전국" if region in ("", "전국") else region,
-        target_text=" · ".join(x for x in [clean(raw.get("aply_trgt_ctnt")), clean(raw.get("biz_enyy"))] if x),
-        summary=clean(raw.get("pbanc_ctnt")),
-        apply_method=clean(raw.get("aply_mthd_onli_rcpt_istc")) or clean(raw.get("aply_mthd_etc_istc")),
-        contact=" ".join(x for x in [clean(raw.get("biz_prch_dprt_nm")), clean(raw.get("prch_cnpl_no"))] if x),
-        url=raw.get("detl_pg_url") or "",
-        start=to_date(raw.get("pbanc_rcpt_bgng_dt")), end=to_date(raw.get("pbanc_rcpt_end_dt")),
-        period_text=f"{raw.get('pbanc_rcpt_bgng_dt') or ''} ~ {raw.get('pbanc_rcpt_end_dt') or ''}",
-        age_min=19 if youth_only else None, age_max=39 if youth_only else None,
-        youth_hint=youth_only, target_hints=["창업"],
-        category=_kstartup_category(clean(raw.get("supt_biz_clsfc"))),
-    )
+def to_date(s) -> str | None:
+    """'20190305', '2019-03-05', '2019.03.05' → '2019-03-05'"""
+    if not s:
+        return None
+    digits = re.sub(r"\D", "", str(s))[:8]
+    if len(digits) != 8:
+        return None
+    try:
+        return date(int(digits[:4]), int(digits[4:6]), int(digits[6:])).isoformat()
+    except ValueError:
+        return None
 
 
-# ---- 경기도 일자리 지원정책 (경기도일자리재단 잡아바, 경기데이터드림) ----
-JOBABA_CATEGORY = {"주거": "주거", "생활": "생활·복지", "기업": "사업 지원"}
+def type_of(uptae: str | None, category: str) -> str:
+    text = uptae or ""
+    for t, words in TYPES.items():
+        if any(w in text for w in words):
+            return t
+    return "베이커리" if category == "제과점" else "기타"
 
 
-def jobaba(raw: dict) -> dict:
-    div = clean(raw.get("DIV_NM"))
-    start, end = to_date(raw.get("RECRUT_BEGIN_DE")), to_date(raw.get("RECRUT_END_DE"))
-    title = clean(raw.get("PBLANC_TITLE"))
-    return _base(
-        id="jobaba:" + hashlib.sha1(f"{title}|{raw.get('INST_NM')}|{raw.get('RECRUT_BEGIN_DE')}".encode()).hexdigest()[:12],
-        source="jobaba", title=title, agency=clean(raw.get("INST_NM")),
-        region_text=clean(raw.get("REGION_NM")), target_text=div,
-        url=raw.get("DETAIL_PAGE_URL") or "", start=start, end=end,
-        period_text=f"{raw.get('RECRUT_BEGIN_DE') or ''} ~ {raw.get('RECRUT_END_DE') or ''}",
-        always=not end, youth_hint="청년" in div or "청년" in title,
-        category=next((v for k, v in JOBABA_CATEGORY.items() if k in div), "일자리"),
-    )
+LOT_RE = re.compile(r"([가-힣0-9]+동)\s*(산?\s*\d+(?:-\d+)?)")
+FLOOR_RE = re.compile(r"(지하\s*\d+|\d+)\s*층")
+HO_RE = re.compile(r"(\d+)\s*호")
 
 
-NORMALIZERS = {"gov24": gov24, "bizinfo": bizinfo, "kstartup": kstartup, "jobaba": jobaba}
+def site_key(lotno: str | None, road: str | None) -> tuple[str | None, str | None, bool]:
+    """같은 '점포 자리'를 묶는 키 = 법정동 + 번지 (+ 층·호가 있으면).
+    층·호가 없으면 건물 단위로 묶이므로 세 번째 값(unit)이 False."""
+    m = LOT_RE.search(lotno or "") or LOT_RE.search(road or "")
+    if not m:
+        return None, None, False
+    dong, lot = m.group(1), m.group(2).replace(" ", "")
+    detail = f"{road or ''} {lotno or ''}"
+    fl, ho = FLOOR_RE.search(detail), HO_RE.search(detail)
+    unit = (fl.group(1).replace(" ", "") + "층" if fl else "") + (ho.group(1) + "호" if ho else "")
+    return f"{dong} {lot}" + (f" {unit}" if unit else ""), dong, bool(unit)
+
+
+def is_temporary(name: str) -> bool:
+    """백화점 팝업처럼 '(한시적)' 영업은 자리 내력에서 뺍니다 (몇 주 단위로 바뀌어 '자주 바뀐 자리'를 왜곡)."""
+    return "한시적" in (name or "")
+
+
+def normalize(source: str, category: str, rec: dict) -> dict:
+    lat = lng = None
+    x, y = pick(rec, FIELDS["x"]), pick(rec, FIELDS["y"])
+    if x and y:
+        lat, lng = _to_wgs84(x, y)
+    uptae = pick(rec, FIELDS["uptae"])
+    return {
+        "source": source,
+        "name": pick(rec, FIELDS["name"]) or "(상호 미상)",
+        "uptae": uptae or "",
+        "type": type_of(uptae, category),
+        "open": to_date(pick(rec, FIELDS["open"])),
+        "close": to_date(pick(rec, FIELDS["close"])),
+        "lotno": pick(rec, FIELDS["lotno"]) or "",
+        "road": pick(rec, FIELDS["road"]) or "",
+        "lat": lat,
+        "lng": lng,
+    }
